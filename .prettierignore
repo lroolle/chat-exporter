@@ -1,0 +1,5 @@
+node_modules
+dist
+.wxt
+*.log
+package-lock.json
