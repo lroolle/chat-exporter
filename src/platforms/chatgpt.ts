@@ -2,7 +2,7 @@
  * ChatGPT platform adapter
  */
 
-import type { Conversation, Message, PlatformAdapter } from '../core/types';
+import type { Conversation, ImageAsset, Message, PlatformAdapter } from '../core/types';
 
 // Selectors from chatgpt.js for robustness
 const SELECTORS = {
@@ -23,7 +23,7 @@ export class ChatGPTAdapter implements PlatformAdapter {
     return /chatgpt\.com|chat\.openai\.com/.test(url);
   }
 
-  scrape(doc: Document): Conversation | null {
+  async scrape(doc: Document): Promise<Conversation | null> {
     // ChatGPT's main conversation container
     const mainElement = doc.querySelector(SELECTORS.main);
     if (!mainElement) return null;
@@ -61,17 +61,19 @@ export class ChatGPTAdapter implements PlatformAdapter {
 
     if (!messageElements.length) return null;
 
-    const messages: Message[] = messageElements.map(el => {
+    const messages: Message[] = [];
+    for (const el of messageElements) {
       const role = el.getAttribute('data-message-author-role') as 'user' | 'assistant' | 'system';
-
-      // Extract markdown content elegantly
-      let content = this.extractMarkdownContent(el);
-
-      return {
+      const { content, images } = await this.extractMarkdownContent(el);
+      const message: Message = {
         role,
         content,
       };
-    });
+      if (images.length) {
+        message.images = images;
+      }
+      messages.push(message);
+    }
 
     // Parse URL for metadata
     const url = window.location.href;
@@ -131,21 +133,22 @@ export class ChatGPTAdapter implements PlatformAdapter {
   }
 
   /**
-   * Extract markdown from message element
-   * Note: return after each element type prevents recursive double-processing
+   * Extract markdown and inline image data from a message element
    */
-  private extractMarkdownContent(element: Element): string {
+  private async extractMarkdownContent(
+    element: Element
+  ): Promise<{ content: string; images: ImageAsset[] }> {
     const parts: string[] = [];
+    const images: ImageAsset[] = [];
+    const contentRoot = this.getContentRoot(element);
 
-    const processNode = (node: Node): void => {
+    const processNode = async (node: Node): Promise<void> => {
       if (node.nodeType === Node.ELEMENT_NODE) {
         const el = node as HTMLElement;
 
-        // Pre/code blocks
         if (el.tagName === 'PRE') {
           const codeEl = el.querySelector('code');
           if (codeEl) {
-            // Try to detect language from class
             const langClass = Array.from(codeEl.classList).find(c => c.startsWith('language-'));
             const lang = langClass ? langClass.replace('language-', '') : '';
             const code = codeEl.textContent || '';
@@ -154,25 +157,21 @@ export class ChatGPTAdapter implements PlatformAdapter {
           }
         }
 
-        // Inline code
         if (el.tagName === 'CODE' && el.parentElement?.tagName !== 'PRE') {
           parts.push(`\`${el.textContent}\``);
           return;
         }
 
-        // Bold (textContent flattens nested formatting - acceptable for MVP)
         if (el.tagName === 'STRONG' || el.tagName === 'B') {
           parts.push(`**${el.textContent}**`);
           return;
         }
 
-        // Italic
         if (el.tagName === 'EM' || el.tagName === 'I') {
           parts.push(`*${el.textContent}*`);
           return;
         }
 
-        // Links
         if (el.tagName === 'A') {
           const href = el.getAttribute('href') || '';
           const text = el.textContent || '';
@@ -180,7 +179,6 @@ export class ChatGPTAdapter implements PlatformAdapter {
           return;
         }
 
-        // Lists - preserve structure
         if (el.tagName === 'UL' || el.tagName === 'OL') {
           const items = Array.from(el.querySelectorAll(':scope > li'));
           items.forEach((li, idx) => {
@@ -190,27 +188,31 @@ export class ChatGPTAdapter implements PlatformAdapter {
           return;
         }
 
-        // Headings
         if (/^H[1-6]$/.test(el.tagName)) {
           const level = el.tagName[1];
           parts.push(`${'#'.repeat(parseInt(level))} ${el.textContent?.trim()}`);
           return;
         }
 
-        // Block quotes
         if (el.tagName === 'BLOCKQUOTE') {
           const lines = (el.textContent || '').split('\n');
           parts.push(lines.map(line => `> ${line}`).join('\n'));
           return;
         }
 
-        // Tables
         if (el.tagName === 'TABLE') {
           parts.push(this.convertTableToMarkdown(el));
           return;
         }
 
-        // Skip buttons and UI elements
+        if (el.tagName === 'IMG') {
+          const markdown = await this.serializeImageElement(el as HTMLImageElement, images);
+          if (markdown) {
+            parts.push(markdown);
+          }
+          return;
+        }
+
         if (
           el.tagName === 'BUTTON' ||
           el.classList.contains('copy-code') ||
@@ -219,11 +221,12 @@ export class ChatGPTAdapter implements PlatformAdapter {
           return;
         }
 
-        // Recurse into other elements
-        Array.from(el.childNodes).forEach(processNode);
+        for (const child of Array.from(el.childNodes)) {
+          await processNode(child);
+        }
+        return;
       }
 
-      // Text nodes
       if (node.nodeType === Node.TEXT_NODE) {
         const text = node.textContent || '';
         if (text.trim()) {
@@ -232,14 +235,125 @@ export class ChatGPTAdapter implements PlatformAdapter {
       }
     };
 
-    Array.from(element.childNodes).forEach(processNode);
+    for (const child of Array.from(contentRoot.childNodes)) {
+      await processNode(child);
+    }
 
-    return parts
+    const content = parts
       .join('\n')
-      .replace(/\n{3,}/g, '\n\n') // Max 2 consecutive newlines
-      .replace(/^ChatGPT\s*/gm, '') // Strip sender labels
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/^ChatGPT\s*/gm, '')
       .replace(/^You\s*/gm, '')
       .trim();
+
+    return { content, images };
+  }
+
+  private getContentRoot(element: Element): Element {
+    return (
+      element.querySelector('[data-testid="conversation-turn-content"]') ||
+      element.querySelector('.markdown') ||
+      element.querySelector('article') ||
+      element
+    );
+  }
+
+  private async serializeImageElement(
+    img: HTMLImageElement,
+    images: ImageAsset[]
+  ): Promise<string | null> {
+    const src = img.currentSrc || img.src;
+    if (!src) return null;
+
+    const rawAlt = (img.getAttribute('alt') || img.getAttribute('aria-label') || 'Image').trim();
+    const escapedAlt = this.escapeMarkdown(rawAlt);
+
+    let dataUri: string | undefined;
+    let mimeType: string | undefined;
+
+    if (src.startsWith('data:')) {
+      dataUri = src;
+      const mimeMatch = /^data:([^;]+);/.exec(src);
+      mimeType = mimeMatch?.[1];
+    } else {
+      try {
+        const inlineData = await this.fetchImageDataUri(src);
+        dataUri = inlineData.dataUri;
+        mimeType = inlineData.mimeType;
+      } catch (error) {
+        console.warn('[Chat Exporter] Failed to fetch image data', error);
+        try {
+          const fallback = await this.convertImageToCanvasDataUri(img);
+          dataUri = fallback.dataUri;
+          mimeType = fallback.mimeType;
+        } catch (canvasError) {
+          console.warn('[Chat Exporter] Canvas fallback failed', canvasError);
+        }
+      }
+    }
+
+    const asset: ImageAsset = {
+      alt: rawAlt,
+      originalSrc: src,
+      width: img.naturalWidth || img.width || undefined,
+      height: img.naturalHeight || img.height || undefined,
+    };
+
+    if (dataUri) asset.dataUri = dataUri;
+    if (mimeType) asset.mimeType = mimeType;
+
+    images.push(asset);
+
+    const target = dataUri || src;
+    return `![${escapedAlt}](${target})`;
+  }
+
+  private async fetchImageDataUri(url: string): Promise<{ dataUri: string; mimeType: string }> {
+    const response = await fetch(url, { credentials: 'include' });
+    if (!response.ok) throw new Error(`Failed to fetch image: ${response.status}`);
+    const blob = await response.blob();
+
+    const dataUri = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          resolve(reader.result);
+        } else {
+          reject(new Error('Invalid image data'));
+        }
+      };
+      reader.onerror = () => reject(reader.error || new Error('Failed to read image data'));
+      reader.readAsDataURL(blob);
+    });
+
+    return { dataUri, mimeType: blob.type || 'application/octet-stream' };
+  }
+
+  private async convertImageToCanvasDataUri(
+    img: HTMLImageElement
+  ): Promise<{ dataUri: string; mimeType: string }> {
+    if (!img.complete) {
+      await img.decode?.().catch(() => undefined);
+    }
+
+    const width = img.naturalWidth || img.width;
+    const height = img.naturalHeight || img.height;
+    if (!width || !height) throw new Error('Image has no dimensions');
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas context unavailable');
+
+    ctx.drawImage(img, 0, 0, width, height);
+    const mimeType = 'image/png';
+    const dataUri = canvas.toDataURL(mimeType);
+    return { dataUri, mimeType };
+  }
+
+  private escapeMarkdown(text: string): string {
+    return text.replace(/([\\[\]])/g, '\\$1');
   }
 
   /**

@@ -8,6 +8,7 @@ Elegant markdown export for ChatGPT conversations. Preserves formatting, code bl
 - **Unambiguous structure** - Emoji banner separators (👤 USER / 🤖 ASSISTANT) prevent heading conflicts
 - **Rich metadata** - YAML frontmatter with model, timestamps, conversation IDs
 - **Smart extraction** - Detects GPTs, Projects, and conversation types
+- **Image capture** - Inlines assistant/user images as base64 data URIs for offline viewing
 - **Loading states** - Visual feedback during export
 - **Unicode-friendly** - Preserves international characters in filenames
 - **Privacy-first** - Client-side only, no server
@@ -52,9 +53,10 @@ The packaged extension will be in `dist/`.
 
 ## Roadmap
 
+- [x] Inline image capture (data URIs)
 - [ ] Multiple format exports (JSON, HTML, TXT)
+- [ ] Binary asset bundles (download images as discrete files)
 - [ ] Batch export (multiple conversations)
-- [ ] Export with images/attachments
 - [ ] Claude, Gemini, Grok support
 - [ ] Projects and folders export
 

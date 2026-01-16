@@ -1,3 +1,12 @@
+## [2025-11-13] Inline image capture for Markdown export
+
+- Context: ChatGPT responses now mix text with screenshots/figures; our export silently dropped every `<img>`.
+- Root Cause: `ChatGPTAdapter.extractMarkdownContent` only gathered text nodes, never fetching inline assets, and the exporter ran synchronously so we couldn't await blob reads.
+- Fix: Make the adapter scrape async, walk the rich content subtree only, fetch/canvas each image into a data URI, and embed `![alt](data:...)` markup while stashing metadata for future asset packs. (see `src/platforms/chatgpt.ts`, `src/core/types.ts`, `entrypoints/content.ts`)
+- Docs: README + roadmap call out inline image support; DEVLOG documents the change.
+- Result: Markdown exports now include assistant/user images inline, preserving visual context even when offline.
+
+---
 
 ## [2025-11-12] Export button survives SPA header swaps
 
@@ -19,6 +28,7 @@
 
 - How:
   - Commands:
+
     ```bash
     npm run dev      # Development with hot reload
     npm run build    # Production → dist/chrome-mv3/
@@ -26,12 +36,14 @@
     ```
 
   - Key Implementation:
+
     ```typescript
     // DOM timing: Wait for Share button as ready signal
     const observer = new MutationObserver(() => {
-      const shareButton = buttons.find(btn =>
-        btn.textContent?.includes('Share') ||
-        btn.getAttribute('aria-label')?.toLowerCase().includes('share')
+      const shareButton = buttons.find(
+        btn =>
+          btn.textContent?.includes('Share') ||
+          btn.getAttribute('aria-label')?.toLowerCase().includes('share')
       );
       if (mainContent && shareButton) {
         injectExportButton();
@@ -84,10 +96,12 @@
 ## Critical Problems Solved
 
 ### 1. DOM Injection Timing
+
 **Problem**: Export button not appearing
 **Cause**: MutationObserver watched `main` element but Share button loads later in React render cycle
 
 **Solution**: Wait specifically for Share button as signal
+
 ```typescript
 // Failed: Too early
 if (mainContent) injectExportButton(); // Share not ready
@@ -113,10 +127,12 @@ setTimeout(() => {
 **Result**: Reliable injection on both page load and navigation
 
 ### 2. Button Positioning
+
 **Problem**: Button in wrong location or using fallback fixed position
 **Cause**: React-rendered header structure varies, no stable selector
 
 **Solution**: Cascading strategies
+
 ```typescript
 // Strategy 1: Next to Share button (BEST - 95%+ success)
 const shareButton = buttons.find(btn => btn.textContent?.includes('Share'));
@@ -137,16 +153,21 @@ if (pageHeader) {
 
 // Strategy 3: Fixed position fallback (LAST RESORT)
 Object.assign(button.style, {
-  position: 'fixed', top: '16px', right: '20px', zIndex: '9999'
+  position: 'fixed',
+  top: '16px',
+  right: '20px',
+  zIndex: '9999',
 });
 document.body.appendChild(button);
 ```
 
 ### 3. Markdown Structure Ambiguity
+
 **Problem**: Standard `## User` / `## Assistant` headers conflict if AI generates same text
 **Alternatives Rejected**: Plain headers (ambiguous), XML tags (ugly), JSON (unreadable)
 
 **Solution**: Emoji banner separators
+
 ```markdown
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 👤 USER
@@ -156,15 +177,16 @@ document.body.appendChild(button);
 **Why**: Unambiguous (AI won't generate 60-char unicode line + emoji + role label), parseable, visually distinct, markdown-compatible
 
 ### 4. Formatting Preservation
+
 **Problem**: Code blocks losing language hints, tables collapsing, links breaking
 **Cause**: ChatGPT renders markdown → DOM, naive textContent extraction loses structure
 
 **Solution**: Recursive DOM traversal respecting element semantics
+
 ```typescript
 // Code blocks: Extract language from class
 if (el.tagName === 'PRE') {
-  const langClass = Array.from(codeEl.classList)
-    .find(c => c.startsWith('language-'));
+  const langClass = Array.from(codeEl.classList).find(c => c.startsWith('language-'));
   const lang = langClass ? langClass.replace('language-', '') : '';
   parts.push(`\`\`\`${lang}\n${codeEl.textContent}\n\`\`\``);
   return;
@@ -180,13 +202,16 @@ if (el.tagName === 'TABLE') {
 **Result**: All formatting preserved (code with language hints, tables, bold/italic, links, lists, headings)
 
 ### 5. GPT/Project URL Detection
+
 **URLs**:
+
 - Standard: `chatgpt.com/c/{id}`
 - GPT: `chatgpt.com/g/g-2DQzU5UZl/c/{id}` (short)
 - GPT: `chatgpt.com/g/g-689ae2f1363881919fc41124c7dbc2fd/c/{id}` (long hex)
 - Project: `chatgpt.com/g/g-p-{id}/c/{id}`
 
 **Solution**: Regex with optional project prefix
+
 ```typescript
 const gptMatch = url.match(/\/g\/(g-(?:p-)?[a-zA-Z0-9]+)/);
 const gptId = gptMatch ? gptMatch[1] : undefined;
