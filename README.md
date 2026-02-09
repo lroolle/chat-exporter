@@ -1,13 +1,24 @@
 # Chat Exporter
 
-Elegant markdown export for ChatGPT conversations. Preserves formatting, code blocks, and conversation structure.
+Elegant markdown export for ChatGPT, Claude, Gemini, and Grok conversations. Preserves formatting, code blocks, and conversation structure with consistent output across all platforms.
+
+## Supported Platforms
+
+| Platform    | Export Method      | Features                             |
+| ----------- | ------------------ | ------------------------------------ |
+| **ChatGPT** | DOM scraping       | GPTs, Projects, images               |
+| **Claude**  | API + DOM fallback | Artifacts, thinking blocks, branches |
+| **Gemini**  | batchexecute RPC   | Thoughts/reasoning, Gems             |
+| **Grok**    | DOM heuristics     | X.com integration                    |
 
 ## Features
 
+- **Multi-platform** - One extension for ChatGPT, Claude, Gemini, and Grok
 - **Elegant markdown** - Preserves code blocks with syntax hints, tables, lists, formatting
 - **Unambiguous structure** - Emoji banner separators (👤 USER / 🤖 ASSISTANT) prevent heading conflicts
 - **Rich metadata** - YAML frontmatter with model, timestamps, conversation IDs
-- **Smart extraction** - Detects GPTs, Projects, and conversation types
+- **Smart extraction** - Detects GPTs, Projects, Artifacts, and conversation types
+- **Thinking/Reasoning** - Preserves Claude extended thinking and Gemini reasoning
 - **Image capture** - Inlines assistant/user images as base64 data URIs for offline viewing
 - **Loading states** - Visual feedback during export
 - **Unicode-friendly** - Preserves international characters in filenames
@@ -40,9 +51,13 @@ The packaged extension will be in `dist/`.
 
 ## Usage
 
-1. Open any ChatGPT conversation at `chatgpt.com`
-2. Look for the green "↓ Export MD" button (top right)
-3. Click to download the current conversation as Markdown
+1. Open any conversation on:
+   - `chatgpt.com` / `chat.openai.com`
+   - `claude.ai`
+   - `gemini.google.com`
+   - `grok.com` / `x.com/i/grok`
+2. Click the floating bubble (bottom-right corner)
+3. Download starts automatically as Markdown
 
 ## Supported Export Formats
 
@@ -54,10 +69,10 @@ The packaged extension will be in `dist/`.
 ## Roadmap
 
 - [x] Inline image capture (data URIs)
+- [x] Claude, Gemini, Grok support
 - [ ] Multiple format exports (JSON, HTML, TXT)
 - [ ] Binary asset bundles (download images as discrete files)
 - [ ] Batch export (multiple conversations)
-- [ ] Claude, Gemini, Grok support
 - [ ] Projects and folders export
 
 ## Tech Stack

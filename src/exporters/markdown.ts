@@ -105,8 +105,6 @@ export class MarkdownExporter implements Exporter {
 
   private stripThinking(content: string): string {
     // Use multiline flag and anchor to start of line for safer matching
-    return content
-      .replace(/^<thinking>\n[\s\S]*?\n<\/thinking>\n*/gm, '')
-      .trim();
+    return content.replace(/^<thinking>\n[\s\S]*?\n<\/thinking>\n*/gm, '').trim();
   }
 }

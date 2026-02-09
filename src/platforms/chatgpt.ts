@@ -106,32 +106,6 @@ export class ChatGPTAdapter implements PlatformAdapter {
     };
   }
 
-  getInjectionPoint(doc: Document): Element | null {
-    // Strategy 1: Look for Share button by text content
-    const buttons = Array.from(doc.querySelectorAll('button'));
-    const shareButton = buttons.find(
-      btn =>
-        btn.textContent?.includes('Share') ||
-        btn.getAttribute('aria-label')?.includes('Share') ||
-        btn.getAttribute('aria-label')?.includes('share')
-    );
-
-    if (shareButton && shareButton.parentElement) {
-      return shareButton.parentElement;
-    }
-
-    // Strategy 2: Look in page header
-    const pageHeader = doc.querySelector(SELECTORS.pageHeader);
-    if (pageHeader) {
-      const headerButtons = pageHeader.querySelector('.flex.items-center');
-      if (headerButtons) {
-        return headerButtons as Element;
-      }
-    }
-
-    return null;
-  }
-
   /**
    * Extract markdown and inline image data from a message element
    */
@@ -145,6 +119,13 @@ export class ChatGPTAdapter implements PlatformAdapter {
     const processNode = async (node: Node): Promise<void> => {
       if (node.nodeType === Node.ELEMENT_NODE) {
         const el = node as HTMLElement;
+
+        // Handle math elements - extract LaTeX source, skip visual rendering garbage
+        const mathLatex = this.extractMathLatex(el);
+        if (mathLatex !== null) {
+          if (mathLatex) parts.push(mathLatex);
+          return; // Skip children
+        }
 
         if (el.tagName === 'PRE') {
           const codeEl = el.querySelector('code');
@@ -354,6 +335,61 @@ export class ChatGPTAdapter implements PlatformAdapter {
 
   private escapeMarkdown(text: string): string {
     return text.replace(/([\\[\]])/g, '\\$1');
+  }
+
+  /**
+   * Extract LaTeX from math elements. Returns:
+   * - string with $...$ or $$...$$ if math found
+   * - '' (empty) if this is a math visual element to skip
+   * - null if not a math element
+   */
+  private extractMathLatex(el: HTMLElement): string | null {
+    // KaTeX containers
+    if (el.classList.contains('katex') || el.classList.contains('katex-display')) {
+      const annotation = el.querySelector('annotation[encoding="application/x-tex"]');
+      if (annotation?.textContent) {
+        const latex = annotation.textContent.trim();
+        const isDisplay =
+          el.classList.contains('katex-display') || el.closest('.katex-display') !== null;
+        return isDisplay ? `$$${latex}$$` : `$${latex}$`;
+      }
+      return ''; // Skip even if no annotation found
+    }
+
+    // Skip KaTeX visual rendering internals
+    if (el.classList.contains('katex-html') || el.classList.contains('katex-mathml')) {
+      return '';
+    }
+
+    // MathJax containers
+    if (el.classList.contains('MathJax') || el.classList.contains('MathJax_Display')) {
+      const script = el.querySelector('script[type*="math/tex"]') as HTMLScriptElement | null;
+      if (script?.textContent) {
+        const latex = script.textContent.trim();
+        const isDisplay =
+          el.classList.contains('MathJax_Display') || script.type?.includes('display');
+        return isDisplay ? `$$${latex}$$` : `$${latex}$`;
+      }
+      return '';
+    }
+
+    // Skip MathJax internals
+    if (el.className?.includes?.('MJX') || el.classList.contains('mjx-chtml')) {
+      return '';
+    }
+
+    // Direct <math> element with annotation
+    if (el.tagName === 'MATH') {
+      const annotation = el.querySelector('annotation[encoding="application/x-tex"]');
+      if (annotation?.textContent) {
+        const latex = annotation.textContent.trim();
+        const isDisplay = el.getAttribute('display') === 'block';
+        return isDisplay ? `$$${latex}$$` : `$${latex}$`;
+      }
+      return '';
+    }
+
+    return null; // Not a math element
   }
 
   /**

@@ -69,22 +69,6 @@ export class GeminiAdapter implements PlatformAdapter {
     }
   }
 
-  getInjectionPoint(doc: Document): Element | null {
-    // Primary: top-bar-actions right section (where other buttons live)
-    const rightSection = doc.querySelector('top-bar-actions .right-section');
-    if (rightSection) return rightSection;
-
-    // Fallback: top-bar-actions container
-    const topBarActions = doc.querySelector('top-bar-actions .top-bar-actions');
-    if (topBarActions) return topBarActions;
-
-    // Fallback: any top-bar-actions
-    const topBar = doc.querySelector('top-bar-actions');
-    if (topBar) return topBar;
-
-    return null;
-  }
-
   // --- Route Parsing ---
 
   private getRouteFromUrl(): GeminiRoute | null {
@@ -147,7 +131,8 @@ export class GeminiAdapter implements PlatformAdapter {
 
     // Strategy 3: Global WIZ data
     try {
-      const wizData = (window as unknown as { WIZ_global_data?: { SNlM0e?: string } }).WIZ_global_data;
+      const wizData = (window as unknown as { WIZ_global_data?: { SNlM0e?: string } })
+        .WIZ_global_data;
       if (wizData?.SNlM0e) return wizData.SNlM0e;
     } catch (e) {
       console.error('[Gemini] Failed to access WIZ_global_data:', e);
@@ -196,7 +181,9 @@ export class GeminiAdapter implements PlatformAdapter {
 
     if (!res.ok) {
       const t = await res.text().catch(() => '');
-      throw new Error(`batchexecute failed: ${res.status} ${res.statusText}${t ? `\n${t.slice(0, 300)}` : ''}`);
+      throw new Error(
+        `batchexecute failed: ${res.status} ${res.statusText}${t ? `\n${t.slice(0, 300)}` : ''}`
+      );
     }
     return res.text();
   }
@@ -402,7 +389,11 @@ export class GeminiAdapter implements PlatformAdapter {
           const txt = child[1][0].join('\n\n').trim();
           if (txt) return txt;
         }
-        if (Array.isArray(child[0]) && child[0].length >= 1 && child[0].every((x: unknown) => typeof x === 'string')) {
+        if (
+          Array.isArray(child[0]) &&
+          child[0].length >= 1 &&
+          child[0].every((x: unknown) => typeof x === 'string')
+        ) {
           const txt = child[0].join('\n\n').trim();
           if (txt) return txt;
         }
@@ -429,9 +420,14 @@ export class GeminiAdapter implements PlatformAdapter {
 
     for (const child of node) {
       if (this.isUserMessageNode(child) && !userNode) userNode = child;
-      if (this.isAssistantContainer(child) && !assistantContainer) assistantContainer = child as unknown[];
+      if (this.isAssistantContainer(child) && !assistantContainer)
+        assistantContainer = child as unknown[];
       if (this.isTimestampPair(child)) {
-        if (!tsCandidate || child[0] > tsCandidate[0] || (child[0] === tsCandidate[0] && child[1] > tsCandidate[1])) {
+        if (
+          !tsCandidate ||
+          child[0] > tsCandidate[0] ||
+          (child[0] === tsCandidate[0] && child[1] > tsCandidate[1])
+        ) {
           tsCandidate = child;
         }
       }
@@ -489,7 +485,9 @@ export class GeminiAdapter implements PlatformAdapter {
     const ts1 = block.tsPair?.[1] || 0;
     // Include first/last chars for better collision resistance
     const userSig = block.userText ? `${block.userText[0]}${block.userText.slice(-1)}` : '';
-    const assistSig = block.assistantText ? `${block.assistantText[0]}${block.assistantText.slice(-1)}` : '';
+    const assistSig = block.assistantText
+      ? `${block.assistantText[0]}${block.assistantText.slice(-1)}`
+      : '';
     return `${userLen}:${assistLen}:${thoughtLen}:${ts0}:${ts1}:${userSig}:${assistSig}`;
   }
 

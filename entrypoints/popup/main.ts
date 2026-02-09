@@ -1,7 +1,11 @@
 import { getSettings, saveSettings, type ExportSettings } from '../../src/core/settings';
 
 type BooleanSettingKey = 'includeThinking' | 'includeMetadata' | 'includeTimestamps';
-const SETTING_KEYS: BooleanSettingKey[] = ['includeThinking', 'includeMetadata', 'includeTimestamps'];
+const SETTING_KEYS: BooleanSettingKey[] = [
+  'includeThinking',
+  'includeMetadata',
+  'includeTimestamps',
+];
 
 async function init() {
   const settings = await getSettings();

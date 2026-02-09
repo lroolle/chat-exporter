@@ -35,7 +35,6 @@ export interface PlatformAdapter {
   id: string;
   matches(url: string): boolean;
   scrape(doc: Document): Promise<Conversation | null>;
-  getInjectionPoint(doc: Document): Element | null;
 }
 
 export interface ExportOptions {

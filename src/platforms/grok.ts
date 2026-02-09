@@ -71,38 +71,6 @@ export class GrokAdapter implements PlatformAdapter {
     };
   }
 
-  getInjectionPoint(doc: Document): Element | null {
-    // Strategy 1: Find the "Copy share link" button and return its parent container
-    // This places our export button in the header action buttons row
-    const shareBtn = doc.querySelector('button[aria-label="Copy share link"]');
-    if (shareBtn?.parentElement) {
-      return shareBtn.parentElement;
-    }
-
-    // Strategy 2: Find other known buttons as fallback
-    const knownButtons = ['Bookmark', 'Chat history', 'New Chat'];
-    for (const label of knownButtons) {
-      const btn = doc.querySelector(`button[aria-label="${label}"]`);
-      if (btn?.parentElement) {
-        return btn.parentElement;
-      }
-    }
-
-    // Strategy 3: Header area with flex layout
-    const header = doc.querySelector('header');
-    if (header) {
-      const flexContainer = header.querySelector('[class*="r-18u37iz"]');
-      if (flexContainer) return flexContainer;
-      return header;
-    }
-
-    // Strategy 4: Banner role
-    const banner = doc.querySelector('[role="banner"]');
-    if (banner) return banner;
-
-    return null;
-  }
-
   private extractTitle(doc: Document, messages: Message[]): string {
     const docTitle = doc.title;
     if (docTitle && docTitle !== 'Grok' && !docTitle.toLowerCase().includes('grok.com')) {
@@ -160,9 +128,10 @@ export class GrokAdapter implements PlatformAdapter {
     const seenTexts = new Set<string>();
 
     // Find main content - try multiple selectors
-    const mainArea = doc.querySelector('main[role="main"]') ||
-                     doc.querySelector('[data-testid="primaryColumn"]') ||
-                     doc.body;
+    const mainArea =
+      doc.querySelector('main[role="main"]') ||
+      doc.querySelector('[data-testid="primaryColumn"]') ||
+      doc.body;
 
     console.log('[Grok] Searching for messages in:', mainArea.tagName);
 
@@ -296,7 +265,7 @@ export class GrokAdapter implements PlatformAdapter {
       /^\d+ posts?$/i,
       /^Expert$/i,
       /^Focus Mode$/i,
-      /^@\w+$/,  // Just a username
+      /^@\w+$/, // Just a username
       /^To view keyboard shortcuts/i,
       /^Skip to/i,
     ];
@@ -443,7 +412,11 @@ export class GrokAdapter implements PlatformAdapter {
 
     // === ASSISTANT PATTERNS ===
     // Response starters
-    if (/^(I'll|I can|I'd be happy|Here's|Let me|I understand|Certainly|Absolutely|Looking at)/i.test(text)) {
+    if (
+      /^(I'll|I can|I'd be happy|Here's|Let me|I understand|Certainly|Absolutely|Looking at)/i.test(
+        text
+      )
+    ) {
       assistantScore += 3;
     }
     // Grok personality phrases
@@ -451,7 +424,11 @@ export class GrokAdapter implements PlatformAdapter {
       assistantScore += 4;
     }
     // Analysis starters
-    if (/^(From your|Based on your|Looking at your|The error|This means|Why It's Happening)/i.test(text)) {
+    if (
+      /^(From your|Based on your|Looking at your|The error|This means|Why It's Happening)/i.test(
+        text
+      )
+    ) {
       assistantScore += 4;
     }
     // Code blocks
@@ -459,7 +436,10 @@ export class GrokAdapter implements PlatformAdapter {
       assistantScore += 3;
     }
     // Technical terms in longer messages
-    if (text.length > 100 && /(docker|container|build|error|issue|problem|fix|solution)/i.test(text)) {
+    if (
+      text.length > 100 &&
+      /(docker|container|build|error|issue|problem|fix|solution)/i.test(text)
+    ) {
       assistantScore += 2;
     }
     // Structured content

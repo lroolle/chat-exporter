@@ -4,8 +4,8 @@ export default defineConfig({
   outDir: 'dist',
   manifest: {
     name: 'Chat Exporter',
-    description: 'Export ChatGPT, Gemini, and Grok conversations to Markdown',
-    version: '0.3.0',
+    description: 'Export ChatGPT, Gemini, Grok, and Claude conversations to Markdown',
+    version: '0.4.0',
     permissions: ['activeTab', 'scripting', 'downloads', 'storage'],
     host_permissions: [
       'https://chat.openai.com/*',
@@ -13,6 +13,7 @@ export default defineConfig({
       'https://gemini.google.com/*',
       'https://grok.com/*',
       'https://x.com/*',
+      'https://claude.ai/*',
     ],
     icons: {
       '16': '/icon16.png',
