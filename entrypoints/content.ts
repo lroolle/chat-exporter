@@ -169,10 +169,14 @@ function downloadFile(content: string, filename: string, extension: string) {
 
 function sanitizeFilename(filename: string): string {
   return filename
-    .replace(/[<>:"/\\|?*\x00-\x1F]/g, '')
+    // Filesystem-invalid (Windows/Linux/macOS) + shell-problematic chars
+    .replace(/[<>:"/\\|?*\x00-\x1F()[\]{}$`'!~&;#]/g, '')
+    // Whitespace -> single dash
     .replace(/\s+/g, '-')
-    .replace(/^\.+/, '')
-    .replace(/\.+$/, '')
+    // Collapse consecutive dashes left by stripped chars
+    .replace(/-+/g, '-')
+    // Trim leading/trailing dashes and dots
+    .replace(/^[-.]+|[-.]+$/g, '')
     .substring(0, 200)
     .trim();
 }
