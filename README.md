@@ -1,4 +1,11 @@
+**English** | [中文](README_zh.md)
+
 # Chat Exporter
+
+[![Release](https://img.shields.io/github/v/release/lroolle/chat-exporter?style=flat-square)](https://github.com/lroolle/chat-exporter/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
+[![Chrome MV3](https://img.shields.io/badge/chrome-MV3-brightgreen?style=flat-square&logo=googlechrome&logoColor=white)](https://github.com/lroolle/chat-exporter/releases)
+[![Firefox MV2](https://img.shields.io/badge/firefox-MV2-orange?style=flat-square&logo=firefox&logoColor=white)](https://github.com/lroolle/chat-exporter/releases)
 
 A browser extension that exports your AI chat conversations to clean Markdown files. One click. No server. No account. Just your conversation as a `.md` file.
 
