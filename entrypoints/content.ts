@@ -9,7 +9,7 @@ import { GrokAdapter } from '../src/platforms/grok';
 import { ClaudeAdapter } from '../src/platforms/claude';
 import { MarkdownExporter } from '../src/exporters/markdown';
 import { getSettings } from '../src/core/settings';
-import type { PlatformAdapter } from '../src/core/types';
+import type { Conversation, PlatformAdapter } from '../src/core/types';
 
 registry.registerPlatform(new ChatGPTAdapter());
 registry.registerPlatform(new GeminiAdapter());
@@ -123,7 +123,8 @@ async function exportConversation(platform: PlatformAdapter, bubble: HTMLElement
       includeTimestamps: settings.includeTimestamps,
     });
 
-    downloadFile(content, conversation.title || 'chat-export', exporter.extension);
+    const filename = buildExportFilename(conversation);
+    downloadFile(content, filename, exporter.extension);
 
     // Success
     bubble.innerHTML = `
@@ -149,12 +150,19 @@ async function exportConversation(platform: PlatformAdapter, bubble: HTMLElement
   }
 }
 
+// YYYYMMDD-platform-slug  (sorts chronologically, human-readable)
+function buildExportFilename(conv: Conversation): string {
+  const date = conv.timestamp.slice(0, 10).replace(/-/g, '');
+  const slug = sanitizeFilename(conv.title).slice(0, 60).replace(/-+$/, '');
+  return `${date}-${conv.platform}-${slug}`;
+}
+
 function downloadFile(content: string, filename: string, extension: string) {
   const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `${sanitizeFilename(filename)}.${extension}`;
+  link.download = `${filename}.${extension}`;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 100);
 }
